@@ -2,6 +2,21 @@
 
 HalNet is a web server that generates complete websites on-demand using AI, based on the domain name used to access it. It uses OpenRouter for AI generation and Redis for caching.
 
+## TODO
+
+- Test against any domain, almost a mini DNS running
+    - pivoting so that it's going to be a self contained site
+
+---
+
+- Use breadcrumbs for generation to avoid duplication
+- Prevent sites using "#"
+- Handle "?" get params
+- Use a low cost and fast LLM
+
+- Deploy the site somewhere
+- Buy a domain
+
 ## Features
 
 - 🤖 **AI-Powered**: Uses OpenRouter API to generate complete HTML websites

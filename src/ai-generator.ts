@@ -1,24 +1,13 @@
 import axios from "axios";
 
-export interface DomainInfo {
-    domain: string;
-    subdomain?: string;
-    keywords: string[];
-    tld: string;
-}
-
-export const generateWebsite = async (
-    domainInfo: DomainInfo,
-    path: string,
-    queryParams: any
-): Promise<string> => {
+export const generateContent = async (path: string, queryParams: any): Promise<string> => {
     const openRouterApiKey = process.env.OPENROUTER_API_KEY;
 
     if (!openRouterApiKey) {
         throw new Error("OPENROUTER_API_KEY environment variable is required");
     }
 
-    const prompt = createPrompt(domainInfo, path, queryParams);
+    const prompt = createPrompt(path, queryParams);
 
     try {
         const response = await axios.post(
@@ -52,41 +41,118 @@ export const generateWebsite = async (
         return generatedContent;
     } catch (error) {
         const logger = require("pino")();
-        logger.error({ error, domainInfo, path }, "Error calling OpenRouter API");
+        logger.error({ error, path }, "Error calling OpenRouter API");
         throw new Error("Failed to generate website content");
     }
 };
 
-const createPrompt = (domainInfo: DomainInfo, path: string, queryParams: any): string => {
-    const keywords = domainInfo.keywords.join(", ");
-    const domain = domainInfo.domain;
-    const subdomain = domainInfo.subdomain ? `${domainInfo.subdomain}.` : "";
+const createPrompt = (path: string, queryParams: any): string => {
+    const fileExtension = path.split(".").pop()?.toLowerCase();
 
-    return `Generate a complete, professional HTML website for the domain "${subdomain}${domain}".
+    if (fileExtension === "css") {
+        return createCSSPrompt(path);
+    } else if (fileExtension === "js") {
+        return createJSPrompt(path);
+    } else if (["png", "jpg", "jpeg", "gif", "svg", "ico"].includes(fileExtension || "")) {
+        return createImagePrompt(path);
+    } else {
+        return createHTMLPrompt(path, queryParams);
+    }
+};
 
-Domain Analysis:
-- Main domain: ${domain}
-- Subdomain: ${domainInfo.subdomain || "none"}
-- Keywords: ${keywords}
-- Path: ${path}
-- Query parameters: ${JSON.stringify(queryParams)}
+const createHTMLPrompt = (path: string, queryParams: any): string => {
+    return `Generate a complete, professional HTML page for HalNet - an AI-powered dynamic website generator.
+
+Path: ${path}
+Query parameters: ${JSON.stringify(queryParams)}
+
+HalNet Brand Identity:
+- HalNet is a cutting-edge AI website generator
+- Modern, sleek, tech-forward aesthetic
+- Colors: Deep blues, electric accents, clean whites
+- Professional but innovative feel
 
 Requirements:
 1. Create a full HTML document with <!DOCTYPE html>, proper head section, and body
-2. Include modern CSS styling (embedded in <style> tags or inline)
-3. Make the website responsive and professional-looking
-4. Base the content and theme on the domain name and keywords
-5. If the domain suggests a specific business or purpose, create appropriate content
-6. Include navigation, main content, and footer sections
-7. Use semantic HTML5 elements
-8. Make it look like a real, functional website
+2. ALL resources must be self-contained within HalNet:
+   - CSS: Link to /styles/main.css or /css/style.css (NOT external CDNs)
+   - JS: Link to /js/app.js or similar (NOT external libraries)
+   - Images: Use /images/ paths (NOT external URLs)
+   - Fonts: Use web-safe fonts or /fonts/ paths (NO Google Fonts)
+3. Include consistent HalNet navigation with links like:
+   - Home (/)
+   - About (/about)
+   - Blog (/blog)
+   - Services (/services)
+   - Contact (/contact)
+4. Generate content appropriate for the path (e.g., /about = about HalNet)
+5. Make it responsive and professional
+6. Use semantic HTML5 elements
 
-Style Guidelines:
-- Use modern design principles
-- Include proper meta tags
-- Make it mobile-friendly
-- Use appropriate colors and typography
-- Include placeholder content that makes sense for the domain
+CRITICAL: NO external resources. Everything must resolve to the same domain.
 
 Return ONLY the complete HTML code, no explanations or markdown formatting.`;
+};
+
+const createCSSPrompt = (path: string): string => {
+    return `Generate CSS stylesheet content for HalNet.
+
+Path: ${path}
+
+HalNet Brand Guidelines:
+- Modern, tech-forward design
+- Colors: Deep blues (#1a365d, #2d3748), electric blue accents (#3182ce), clean whites
+- Typography: Clean, modern fonts (system fonts preferred)
+- Responsive design
+- Smooth animations and transitions
+
+Generate appropriate CSS for:
+- Base styles and typography
+- Navigation styling
+- Layout and grid systems
+- Component styles
+- Responsive breakpoints
+- Hover effects and transitions
+
+Return ONLY the CSS code, no comments or explanations.`;
+};
+
+const createJSPrompt = (path: string): string => {
+    return `Generate JavaScript code for HalNet functionality.
+
+Path: ${path}
+
+Requirements:
+- Modern vanilla JavaScript (ES6+)
+- NO external dependencies or libraries
+- Focus on UI interactions, animations, form handling
+- Clean, well-structured code
+- Performance optimized
+
+Generate appropriate JavaScript for:
+- Navigation interactions
+- Form submissions
+- Dynamic content updates
+- Smooth scrolling and animations
+- Mobile menu toggles
+
+Return ONLY the JavaScript code, no comments or explanations.`;
+};
+
+const createImagePrompt = (path: string): string => {
+    return `Generate SVG image content for HalNet.
+
+Path: ${path}
+
+HalNet Brand:
+- Modern, tech aesthetic
+- Deep blues and electric accents
+- Clean, professional design
+
+Create an appropriate SVG for the requested path:
+- Logo files: HalNet branding
+- Icons: Modern, minimal style
+- Graphics: Tech-themed illustrations
+
+Return ONLY the SVG XML code, no explanations.`;
 };

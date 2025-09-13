@@ -2,8 +2,7 @@ import express from "express";
 import { config } from "dotenv";
 import { createClient } from "redis";
 import pino from "pino";
-import { generateWebsite } from "./ai-generator";
-import { extractDomainInfo } from "./domain-parser";
+import { generateContent } from "./ai-generator";
 
 config();
 
@@ -37,14 +36,11 @@ async function startServer() {
 
     app.use(async (req, res) => {
         const requestId = Math.random().toString(36).substring(7);
-        const host = req.get("host") || "localhost";
         const path = req.path;
-        const fullUrl = `${host}${path}`;
 
         logger.info(
             {
                 requestId,
-                host,
                 path,
                 method: req.method,
                 userAgent: req.get("user-agent"),
@@ -54,41 +50,47 @@ async function startServer() {
         );
 
         try {
-            const cacheKey = `site:${fullUrl}`;
+            const cacheKey = `halnet:${path}`;
 
             const cached = await redisClient.get(cacheKey);
             if (cached) {
-                logger.info({ requestId, host, cacheKey }, "Serving cached content");
+                logger.info({ requestId, path, cacheKey }, "Serving cached content");
+
+                // Set appropriate content type based on file extension
+                const contentType = getContentType(path);
+                res.setHeader("Content-Type", contentType);
+
                 return res.send(cached);
             }
 
-            logger.info({ requestId, host }, "Cache miss - generating new content");
-
-            const domainInfo = extractDomainInfo(host);
-            logger.debug({ requestId, domainInfo }, "Extracted domain info");
+            logger.info({ requestId, path }, "Cache miss - generating new content");
 
             const startTime = Date.now();
-            const html = await generateWebsite(domainInfo, path, req.query);
+            const content = await generateContent(path, req.query);
             const generationTime = Date.now() - startTime;
 
-            await redisClient.setEx(cacheKey, 3600, html);
+            await redisClient.setEx(cacheKey, 3600, content);
 
             logger.info(
                 {
                     requestId,
-                    host,
+                    path,
                     cacheKey,
                     generationTime: `${generationTime}ms`,
-                    htmlLength: html.length,
+                    contentLength: content.length,
                 },
                 "Generated and cached new content"
             );
 
-            res.send(html);
+            // Set appropriate content type
+            const contentType = getContentType(path);
+            res.setHeader("Content-Type", contentType);
+
+            res.send(content);
         } catch (error) {
-            logger.error({ requestId, host, error }, "Error serving request");
+            logger.error({ requestId, path, error }, "Error serving request");
             res.status(500).send(
-                "<html><body><h1>Error generating website</h1><p>Please try again later.</p></body></html>"
+                "<html><body><h1>Error generating content</h1><p>Please try again later.</p></body></html>"
             );
         }
     });
@@ -96,6 +98,32 @@ async function startServer() {
     app.listen(port, () => {
         logger.info({ port }, "HalNet server started");
     });
+}
+
+function getContentType(path: string): string {
+    const ext = path.split(".").pop()?.toLowerCase();
+
+    switch (ext) {
+        case "css":
+            return "text/css";
+        case "js":
+            return "application/javascript";
+        case "json":
+            return "application/json";
+        case "png":
+            return "image/png";
+        case "jpg":
+        case "jpeg":
+            return "image/jpeg";
+        case "gif":
+            return "image/gif";
+        case "svg":
+            return "image/svg+xml";
+        case "ico":
+            return "image/x-icon";
+        default:
+            return "text/html";
+    }
 }
 
 startServer().catch(console.error);
