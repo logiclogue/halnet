@@ -13,33 +13,37 @@ HalNet is a web server that generates complete websites on-demand using AI, base
 ## Quick Start
 
 1. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+
+    ```bash
+    npm install
+    ```
 
 2. **Set up environment:**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your OpenRouter API key
-   ```
+
+    ```bash
+    cp .env.example .env
+    # Edit .env with your OpenRouter API key
+    ```
 
 3. **Start Redis:**
-   ```bash
-   # Using Docker
-   docker run -d -p 6379:6379 redis:alpine
-   
-   # Or install Redis locally
-   ```
+
+    ```bash
+    # Using Docker
+    docker run -d -p 6379:6379 redis:alpine
+
+    # Or install Redis locally
+    ```
 
 4. **Run the server:**
-   ```bash
-   # Development mode
-   npm run dev
-   
-   # Production mode
-   npm run build
-   npm start
-   ```
+
+    ```bash
+    # Development mode
+    npm run dev
+
+    # Production mode
+    npm run build
+    npm start
+    ```
 
 ## Environment Variables
 
@@ -60,13 +64,13 @@ HalNet is a web server that generates complete websites on-demand using AI, base
 ## Domain Examples
 
 - `pizza.example.com` → Generates a pizza restaurant website
-- `tech.example.com` → Generates a technology company website  
+- `tech.example.com` → Generates a technology company website
 - `blog.example.com` → Generates a blog website
 - `portfolio.example.com` → Generates a portfolio website
 
 ## Deployment
 
-For production deployment, point your DNS wildcard record (*.yourdomain.com) to your server running HalNet.
+For production deployment, point your DNS wildcard record (\*.yourdomain.com) to your server running HalNet.
 
 ## License
 
