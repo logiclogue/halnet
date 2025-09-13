@@ -1,13 +1,17 @@
 import axios from "axios";
 
-export const generateContent = async (path: string, queryParams: any): Promise<string> => {
+export const generateContent = async (
+    path: string,
+    queryParams: any,
+    redisClient?: any
+): Promise<string> => {
     const openRouterApiKey = process.env.OPENROUTER_API_KEY;
 
     if (!openRouterApiKey) {
         throw new Error("OPENROUTER_API_KEY environment variable is required");
     }
 
-    const prompt = createPrompt(path, queryParams);
+    const prompt = await createPrompt(path, queryParams, redisClient);
 
     try {
         const response = await axios.post(
@@ -46,7 +50,7 @@ export const generateContent = async (path: string, queryParams: any): Promise<s
     }
 };
 
-const createPrompt = (path: string, queryParams: any): string => {
+const createPrompt = async (path: string, queryParams: any, redisClient?: any): Promise<string> => {
     const fileExtension = path.split(".").pop()?.toLowerCase();
 
     if (fileExtension === "css") {
@@ -56,40 +60,86 @@ const createPrompt = (path: string, queryParams: any): string => {
     } else if (["png", "jpg", "jpeg", "gif", "svg", "ico"].includes(fileExtension || "")) {
         return createImagePrompt(path);
     } else {
-        return createHTMLPrompt(path, queryParams);
+        return await createHTMLPrompt(path, queryParams, redisClient);
     }
 };
 
-const createHTMLPrompt = (path: string, queryParams: any): string => {
-    return `Generate a complete, professional HTML page for HalNet - an AI-powered dynamic website generator.
+const createHTMLPrompt = async (
+    path: string,
+    queryParams: any,
+    redisClient?: any
+): Promise<string> => {
+    const pathSegments = path.split("/").filter(segment => segment !== "");
+    const parentPath = pathSegments.length > 1 ? "/" + pathSegments.slice(0, -1).join("/") : "/";
+    const currentPage = pathSegments[pathSegments.length - 1] || "home";
 
-Path: ${path}
+    // Get parent page HTML for style consistency
+    let parentHTML = "";
+    if (redisClient && parentPath !== path) {
+        try {
+            const parentCacheKey = `halnet:${parentPath}`;
+            parentHTML = (await redisClient.get(parentCacheKey)) || "";
+            if (parentHTML) {
+                // Truncate if too long to avoid token limits
+                parentHTML =
+                    parentHTML.length > 2000 ? parentHTML.substring(0, 2000) + "..." : parentHTML;
+            }
+        } catch (error) {
+            // Ignore cache errors
+        }
+    }
+
+    const parentSection = parentHTML
+        ? `
+
+PARENT PAGE HTML (for style reference):
+\`\`\`html
+${parentHTML}
+\`\`\`
+
+Use the above parent page as a style and structure reference. Maintain consistent:
+- Navigation structure
+- CSS class names and styling approach  
+- Layout patterns
+- Color scheme and typography
+- Header/footer structure
+`
+        : "";
+
+    return `Generate a complete, professional HTML page for HalNet.
+
+Current Path: ${path}
+Parent Path: ${parentPath}
+Current Page: ${currentPage}
 Query parameters: ${JSON.stringify(queryParams)}
 
-HalNet Brand Identity:
-- HalNet is a cutting-edge AI website generator
-- Modern, sleek, tech-forward aesthetic
-- Colors: Deep blues, electric accents, clean whites
-- Professional but innovative feel
+${parentSection}
+
+HalNet World: a world you're in charge of generating as you go. The current page you're on will define how the world is shaped as we move further down the website hierarchy.
+
+Content Guidelines:
+Generate encyclopedia entries, historical records, cultural guides, or reference materials about a world you're in charge of generating.
 
 Requirements:
 1. Create a full HTML document with <!DOCTYPE html>, proper head section, and body
-2. ALL resources must be self-contained within HalNet:
-   - CSS: Link to /styles/main.css or /css/style.css (NOT external CDNs)
-   - JS: Link to /js/app.js or similar (NOT external libraries)
-   - Images: Use /images/ paths (NOT external URLs)
-   - Fonts: Use web-safe fonts or /fonts/ paths (NO Google Fonts)
-3. Include consistent HalNet navigation with links like:
-   - Home (/)
-   - About (/about)
-   - Blog (/blog)
-   - Services (/services)
-   - Contact (/contact)
-4. Generate content appropriate for the path (e.g., /about = about HalNet)
-5. Make it responsive and professional
-6. Use semantic HTML5 elements
+2. ALL resources must be self-contained within a single response:
+   - CSS: All inline or <style>
+   - JS: All inline or <style>
+   - Images: You shouldn't generate any links or generate any images
+   - Fonts: Use web-safe fonts, no external
+3. Include consistent HalNet navigation with main sections, just like Wikipedia would
+4. Generate rich, detailed content about the world that you've created appropriate for the current path
+5. Use Wikipedia-style layout: infoboxes, references, categories, navigation
+6. Make it responsive and scholarly
+7. Use semantic HTML5 elements
+8. If parent HTML provided, maintain consistent styling and structure
+9. Each mentioned thing, must have a link to its own unique page which delves deeper into the website's path structure
+     - e.g. on page /aethelgard/history and there's a title of a section "The Reign of Thorns (circa 0 to 800 AE)", there must be a link to /aethelgard/history/reign-of-thorns
+     - Each page you can only reference one up the hierarchy or down. E.g. on / you cannot reference /physics/dark-matter
 
 CRITICAL: NO external resources. Everything must resolve to the same domain.
+CRITICAL: Maintain visual consistency with parent pages when available.
+CRITICAL: All content must be about the world you're generating, not real world topics.
 
 Return ONLY the complete HTML code, no explanations or markdown formatting.`;
 };
@@ -99,42 +149,46 @@ const createCSSPrompt = (path: string): string => {
 
 Path: ${path}
 
-HalNet Brand Guidelines:
-- Modern, tech-forward design
-- Colors: Deep blues (#1a365d, #2d3748), electric blue accents (#3182ce), clean whites
-- Typography: Clean, modern fonts (system fonts preferred)
-- Responsive design
-- Smooth animations and transitions
+HalNet Visual Guidelines:
+- Ethereal, mystical encyclopedia aesthetic
+- Colors: Deep purples (#4c1d95, #6b21a8), ethereal blues (#1e40af, #3b82f6), silver accents (#e5e7eb), crystalline whites
+- Typography: Scholarly, readable fonts (serif for content, sans-serif for UI)
+- Ancient tome meets digital interface feel
+- Soft glows, subtle animations, floating elements
+- Wikipedia-inspired layout with mystical touches
 
 Generate appropriate CSS for:
-- Base styles and typography
-- Navigation styling
-- Layout and grid systems
-- Component styles
-- Responsive breakpoints
-- Hover effects and transitions
+- Base typography and reading experience
+- Navigation with mystical styling
+- Infobox and table layouts
+- Article formatting and structure
+- Responsive grid systems
+- Ethereal hover effects and transitions
+- Mystical visual elements (glows, shadows)
 
 Return ONLY the CSS code, no comments or explanations.`;
 };
 
 const createJSPrompt = (path: string): string => {
-    return `Generate JavaScript code for HalNet functionality.
+    return `Generate JavaScript code for HalNet.
 
 Path: ${path}
 
 Requirements:
 - Modern vanilla JavaScript (ES6+)
 - NO external dependencies or libraries
-- Focus on UI interactions, animations, form handling
+- Focus on encyclopedia interactions and mystical UI effects
 - Clean, well-structured code
 - Performance optimized
 
 Generate appropriate JavaScript for:
-- Navigation interactions
-- Form submissions
-- Dynamic content updates
-- Smooth scrolling and animations
-- Mobile menu toggles
+- Navigation interactions with ethereal effects
+- Search and filtering functionality
+- Dynamic content loading
+- Mystical animations (glows, floats, particles)
+- Interactive maps and diagrams
+- Collapsible sections and infoboxes
+- Smooth scrolling with magical transitions
 
 Return ONLY the JavaScript code, no comments or explanations.`;
 };
@@ -143,16 +197,6 @@ const createImagePrompt = (path: string): string => {
     return `Generate SVG image content for HalNet.
 
 Path: ${path}
-
-HalNet Brand:
-- Modern, tech aesthetic
-- Deep blues and electric accents
-- Clean, professional design
-
-Create an appropriate SVG for the requested path:
-- Logo files: HalNet branding
-- Icons: Modern, minimal style
-- Graphics: Tech-themed illustrations
 
 Return ONLY the SVG XML code, no explanations.`;
 };

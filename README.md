@@ -10,9 +10,10 @@ HalNet is a web server that generates complete websites on-demand using AI, base
 ---
 
 - Use breadcrumbs for generation to avoid duplication
+- Update to be a mythical site, like Wikipedia
+- Use a low cost and fast LLM
 - Prevent sites using "#"
 - Handle "?" get params
-- Use a low cost and fast LLM
 
 - Deploy the site somewhere
 - Buy a domain

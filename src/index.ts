@@ -36,7 +36,8 @@ async function startServer() {
 
     app.use(async (req, res) => {
         const requestId = Math.random().toString(36).substring(7);
-        const path = req.path;
+        // Normalize path: remove trailing slash (except for root)
+        const path = req.path === "/" ? "/" : req.path.replace(/\/$/, "");
 
         logger.info(
             {
@@ -63,10 +64,32 @@ async function startServer() {
                 return res.send(cached);
             }
 
+            // Check if parent page exists (404 if parent doesn't exist, except for root)
+            const pathSegments = path.split("/").filter(segment => segment !== "");
+            if (pathSegments.length > 1) {
+                const parentPath = "/" + pathSegments.slice(0, -1).join("/");
+                const parentCacheKey = `halnet:${parentPath}`;
+
+                const parentExists = await redisClient.exists(parentCacheKey);
+                if (!parentExists) {
+                    logger.info(
+                        { requestId, path, parentPath },
+                        "Parent page not found - returning 404"
+                    );
+                    res.status(404);
+                    const contentType = getContentType(path);
+                    res.setHeader("Content-Type", contentType);
+
+                    // Return 404 content without caching
+                    const notFoundContent = generate404Content(path, parentPath);
+                    return res.send(notFoundContent);
+                }
+            }
+
             logger.info({ requestId, path }, "Cache miss - generating new content");
 
             const startTime = Date.now();
-            const content = await generateContent(path, req.query);
+            const content = await generateContent(path, req.query, redisClient);
             const generationTime = Date.now() - startTime;
 
             await redisClient.setEx(cacheKey, 3600, content);
@@ -124,6 +147,64 @@ function getContentType(path: string): string {
         default:
             return "text/html";
     }
+}
+
+function generate404Content(requestedPath: string, missingParentPath: string): string {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page Not Found - HalNet</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #4c1d95 0%, #1e40af 100%);
+            color: white;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            text-align: center;
+            max-width: 600px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2rem;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        h1 { font-size: 3rem; margin: 0 0 1rem 0; color: #e5e7eb; }
+        h2 { font-size: 1.5rem; margin: 0 0 1rem 0; color: #c7d2fe; }
+        p { font-size: 1.1rem; line-height: 1.6; margin: 1rem 0; }
+        .path { 
+            font-family: monospace; 
+            background: rgba(0, 0, 0, 0.3); 
+            padding: 0.5rem; 
+            border-radius: 5px; 
+            color: #fbbf24; 
+        }
+        a {
+            color: #60a5fa;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        a:hover { color: #93c5fd; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>404</h1>
+        <h2>Page Not Found</h2>
+        <p>The page <span class="path">${requestedPath}</span> cannot be accessed because its parent page <span class="path">${missingParentPath}</span> doesn't exist yet.</p>
+        <p>In HalNet, pages must be explored in hierarchical order. Please navigate to <a href="${missingParentPath}">${missingParentPath}</a> first to unlock access to deeper content.</p>
+        <p><a href="/">← Return to Main Page</a></p>
+    </div>
+</body>
+</html>`;
 }
 
 startServer().catch(console.error);
