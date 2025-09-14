@@ -92,7 +92,7 @@ async function startServer() {
             const content = await generateContent(path, req.query, redisClient);
             const generationTime = Date.now() - startTime;
 
-            await redisClient.setEx(cacheKey, 3600, content);
+            await redisClient.set(cacheKey, content);
 
             logger.info(
                 {
